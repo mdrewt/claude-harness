@@ -41,201 +41,6 @@ deleted and never counts toward a playtest gate, and an empty `## Slices` means 
 
 ## Slices
 
-### st-21 — client platform: one client, any desktop shell (design)
-
-type: design · tier: hard
-touches: docs/refactors/client-platform.md, docs/refactors/client-shell.md, ARCHITECTURE.md, docs/DECISIONS.md
-after: []
-
-- Operator, 2026-11-23. Before M-local-play's overlay probe (lpw-10), the client gets a cross-cutting refactor that adds and removes no feature. The aim is code that is clean, DRY, reusable and extensible, and easy to maintain and change, with most of it shared by an Electron shell and a Tauri shell whatever the probe finds. The two shells differ only where their frameworks force it. In the best case both draw the overlay and run the same bundle, and lpw-10 compares them like for like. The standing rule is PLAN's "Three ways to play, one codebase": client code is shared across shells, never forked.
-- The design is the plan file `docs/refactors/client-platform.md`, in three parts:
-  - **The host seam.** Every place the client reaches something a shell provides differently, measured from the code by symbol and file. These are: how the shell document and connection target arrive (`__MR_SHELL_CONFIG__`, `client/src/net/shellDocument.ts`); persistent storage; opening an external link and saving a file (the data export, the bug bundle); window, fullscreen and visibility; input sources (the keyboard, the gamepad, and later Steam Input onto the same virtual buttons); and the Steam calls a shell may offer (overlay activation, the auth ticket acs-12 hands over, achievements). Each concern gets one port. The browser build is the only adapter this work writes, and no Electron or Tauri code is written. A port is cut from concrete call sites: one with a single implementation and no second host that needs it is not added.
-  - **The rest of `docs/refactors/client-shell.md`**, its extractions 7 to 18. Each is kept, reordered or superseded by name, and none is dropped silently.
-  - **Duplication and structure across `client/src/`** (`ui/`, `render/`, `net/`, `input/`, `tactics/`, `shell/`). Each finding is either an extraction with its owner module or recorded as not worth moving, with the reason.
-- At least two seam shapes are judged, for example one host object injected at boot, and per-concern ports under `client/src/platform/` with the adapter chosen at build time. They are scored on what each shell must write, how they test with the client's existing fakes, and what leaves `main.ts`. A `judge` scores them.
-- Input: `$MEM/readshare-2026-11-26.txt` (per-file read volume into agent contexts, 40 runs: `client/src/main.ts` is read in 22 of 40 at about 73k characters per reading run). Among the orders the module map allows, the plan prefers extractions that move the most code out of `client/src/main.ts`, and names the extraction after which those reads are measured again the same way; a drop under 25% is a non-blocking operator question, not a ranking tool (harness DECISIONS "Structural work is not ranked by a tool").
-- The plan lists its extractions in order, one slice each, per `standards/spec-driven.md` §Refactor slices: move or interface, never both, with `touches:` measured. The supervisor sections them three at a time as usual. The PR that sections the last one adds that id to lpw-10's `after:` in `M-local-play.spec.md`.
-
-- **ST21.1:** WHEN the design is recorded, THE SYSTEM SHALL list in `docs/refactors/client-platform.md` every client call site that reaches a host-provided capability (symbol and file), the port that owns it, and what a browser, an Electron and a Tauri adapter would each provide for it.
-- **ST21.2:** WHEN the design is recorded, THE SYSTEM SHALL list its extractions in order, each with whether it is a move or an interface change, its tier, the modules it creates and the tests that already cover the moved behaviour, and SHALL name every remaining extraction of `docs/refactors/client-shell.md` as kept, reordered or superseded.
-- **ST21.3:** WHEN the design is recorded, THE SYSTEM SHALL state, for each extraction, that it adds and removes no feature, and SHALL list every defect found along the way as a finding for a tracked follow-up, never a fix inside a refactor slice.
-- DoD: the plan; a judge's scores over the seam shapes; a `docs/DECISIONS.md` entry for the chosen seam; `ARCHITECTURE.md`'s client section naming the plan.
-
-### st-14 — decision log: foundations and rules
-
-type: docs · tier: routine
-touches: docs/DECISIONS.md, ARCHITECTURE.md
-after: [lpw-27]
-- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "One repository, one cargo workspace" to "Tactical content lives in sidecar registries keyed by id", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
-
-- **st-14.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
-
-- **st-14.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
-- DoD: st-14.1 and st-14.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
-
-### st-15 — decision log: server authority, privacy, zones and sessions
-
-type: docs · tier: routine
-touches: docs/DECISIONS.md, ARCHITECTURE.md
-after: [st-14, lpw-26, lpw-29]
-- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Server authority: thin reducers in domain modules" to "World rows are subscribed by zone", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
-
-- **st-15.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
-
-- **st-15.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
-- DoD: st-15.1 and st-15.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
-
-### st-16 — decision log: prediction, movement input and scaling
-
-type: docs · tier: routine
-touches: docs/DECISIONS.md, ARCHITECTURE.md
-after: [st-15]
-- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Bounded client prediction" to "Integer pixel scaling", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
-
-- **st-16.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
-
-- **st-16.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
-- DoD: st-16.1 and st-16.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
-
-### st-17 — decision log: gameplay rules: evolution, trade, economy, battle
-
-type: docs · tier: routine
-touches: docs/DECISIONS.md, ARCHITECTURE.md
-after: [st-16]
-- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Evolution graph and the auto-evolve rule" to "Wild AI plans are a pure function of the public board", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
-
-- **st-17.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
-
-- **st-17.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
-- DoD: st-17.1 and st-17.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
-
-### st-18 — decision log: accounts, lifecycle, schema and operations
-
-type: docs · tier: routine
-touches: docs/DECISIONS.md, ARCHITECTURE.md
-after: [st-17, lpw-32, lpw-34, lpw-36]
-- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Accounts, guest identity and the claim flow" to "Observability: the module never times itself or calls out", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
-
-- **st-18.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
-
-- **st-18.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
-- DoD: st-18.1 and st-18.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
-
-### st-19 — decision log: client UI and rendering
-
-type: docs · tier: routine
-touches: docs/DECISIONS.md, ARCHITECTURE.md
-after: [st-18, lpw-30]
-- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "Client UI: virtual buttons, one context stack, one overlay frame" to "The world post stack is `pixi-filters`, on the world layer only, planned from injected time", in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
-
-- **st-19.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
-
-- **st-19.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
-- DoD: st-19.1 and st-19.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
-
-### st-20 — decision log: local play, access and the account service
-
-type: docs · tier: routine
-touches: docs/DECISIONS.md, ARCHITECTURE.md
-after: [st-19, lpw-35, lpw-37]
-- Operator, 2026-11-22 (decision review, concern 7). The entries of the game's `docs/DECISIONS.md` from "The connection target is run-time configuration: a shell document set before the client module runs" to the last entry of the file, in file order, are brought to `standards/decisions.md`: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer. Mechanics (which function, which table, which test) move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to the record that made it when one exists, and otherwise stays as one sentence with its date; a fact a reader can re-derive from the code in a few minutes is dropped. A reason that names a test, a file list, a baseline or a hash is rewritten or reported as a finding. An entry another open slice's section says it rewrites is left for that slice: the PR lists each entry left, and the supervisor appends one `type: docs` section for them, `after:` the slices that hold them. No entry is merged with another or deleted here.
-
-- **st-20.1:** WHEN the slice merges, THE SYSTEM SHALL state, for every entry in the range, each reason and each "rules out" clause it held before, or name its removal in the PR with the reason.
-
-- **st-20.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
-- DoD: st-20.1 and st-20.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
-
-Build note (st-20): st-20: twenty-one of the twenty-four entries stay over standards/decisions.md's
-25 lines after the rewrite (heading to pointer line, blanks included): A private world checks an
-account itself 109, A world that is not open 79, Ownership is enforced 64, One character per account
-60, An attestation names the server 50, Every player must own the game on Steam 50, A target's kind
-49, Private servers 47, The account service 43, A browser binds 42, The official build 37, The
-client learns 36, The connection target 33, Local-play budgets 31, Ports 31, Ed25519 30, The gate
-checks a world's password 29, Sized for 1,000 28, Desktop token 27, Electron 27 (left for lpw-10),
-e2e rerun listing 26. st-20.1 keeps every held reason and rules-out clause verbatim; the Why and
-Rules-out paragraphs alone pass 25 lines in the long entries, and no reviewer pass named a clause
-that could go. 'Every player…' and 'The account service…' grew in physical lines only because their
-before-text held lines of 1,000+ characters. Several entries hold more than one decision (the
-private-world check holds first contact, the re-check, the host check and the address rule); a split
-is outside a docs slice.
-
-Build note (st-20): st-20 finding: docs/DECISIONS.md 'The connection target is run-time
-configuration…' Why keeps 'and the unit suites that import main.ts issue no request', a reason
-resting on tests (standards/decisions.md). Two product rewrites were tried and the reviewer refused
-both as false: importing main.ts runs main(), which fetches chunks and connects
-(client/src/main.ts:5634), and the page's /shell-config.js is itself a request
-(client/index.html:155). The fetch's real cost (the throw leaves module scope) is already in the
-entry's Rules out. The next edit of the entry drops the clause or gives a product reason.
-
-Build note (st-20): st-20 finding (reviewer pass 3): the code comment at
-server-module/src/accounts.rs:75-76 says a world build with no published production key 'accepts no
-binding and entitles nobody', mixing two reasons: the missing key stops binding (accounts.rs:75-77),
-and the placeholder world-check address stops entitlement (accounts.rs:92-96). docs/DECISIONS.md
-'The official build holds no attestation key…' and ARCHITECTURE.md Build profiles now give each its
-reason. A comment-accuracy fix outside st-20's touches.
-
-Build note (st-20): st-20 -> acs-15: acs-15's DoD ('no document but the design record states the
-attestation as current') will need to rewrite docs/DECISIONS.md 'The attestation is signed with
-Ed25519…', 'An attestation names the server…', 'A browser binds a friends server…', 'The official
-build holds no attestation key…' (its key half) and the attestation sentence of 'The account service
-is our own small OIDC issuer…', and ARCHITECTURE.md Private worlds (The attestation check, World
-names, Build profiles). acs-15's section names none of these entries, so st-20 rewrote them to the
-decision-log shape; acs-15 does not list docs/DECISIONS.md's sibling ARCHITECTURE.md in touches.
-
-Build note (st-20): st-20 gate run: just ci went red at account-test in 2 of 2 full runs, and just
-account-test alone red in 2 of 2, each time one test, account-service/src/deployment.test.ts 'the
-local-dev recipe > discovery is served through Caddy…' (connect ECONNREFUSED 127.0.0.1:<port> after
-60 s), the Docker Desktop port-forward flake of R-lpw-39-NOTE8318F6. The same file alone passed
-14/14 and the whole account-service suite with --no-file-parallelism passed 2862/2862; the slice
-changes only docs/DECISIONS.md and ARCHITECTURE.md. The flake has grown from 'a different test each
-run' to the same test every parallel run on this host; a stale container
-mr-auth-test-d236a0ce-account-local-dev-1 had been Up 29 hours.
-
-### st-22 — M-gamepad: twin tests and unreached symbols from the close census
-type: refactor · tier: routine
-touches: client/src/input/bindingStore.test.ts, client/src/input/glyphs.test.ts, client/src/input/glyphs.ts, client/src/ui/controlsModel.test.ts, client/src/ui/controlsModel.ts, client/src/ui/controlsView.test.ts
-after: []
-
-`mr-prune close` listed these rows for `M-gamepad` at `40bc77085557469f0ac0f1c2f97050d1c281571e`.
-Each is a candidate, never a reason to delete (`standards/testing-tdd.md` §Deleting a check
-is legitimate). The run that builds this section reads each pair and each symbol's tests
-first and removes only the rows it confirms. A row it does not confirm stays, with its
-reason in the PR body; a pair kept on purpose is recorded with `mr-prune keep`. A twin's
-candidate is deleted and its survivor stays; a symbol is deleted with the tests that reach
-only it. Each deleted test has a `moved-tests:` row in the PR body. A name below is a JSON
-string.
-
-- `client/src/input/glyphs.ts` :: "resetLearnedKeys"
-  - reason: a symbol no production file names
-  - surviving check: the compiler, and the suites that still run
-  - confirmed at merge: the supervisor, who is not the tester that made the deletion, checks that `mr-prune census` on the PR base lists the symbol under `orphans`, and reads the `moved-tests:` rows of the tests removed with it from `client/src/input/glyphs.test.ts`, `client/src/ui/controlsModel.test.ts`, `client/src/ui/controlsView.test.ts`
-  - M-gamepad's spec judged it a test-reset hook kept on purpose: it resets the `learnKey` state in the `beforeEach`/`afterEach` of three suites, so no test reaches only it. The build confirms that judgement and records `mr-prune keep`, or names the reset that replaces it in the PR body.
-- `client/src/ui/controlsModel.ts` :: "controlsRows"
-  - reason: a symbol no production file names
-  - surviving check: the compiler, and the suites that still run
-  - confirmed at merge: the supervisor, who is not the tester that made the deletion, checks that `mr-prune census` on the PR base lists the symbol under `orphans`, and reads the `moved-tests:` rows of the tests removed with it from `client/src/input/bindingStore.test.ts`, `client/src/ui/controlsModel.test.ts`
-
-Pins: none known. Before the first edit the run looks for tests that read a listed file
-as text, and for `.cargo/mutants.toml` entries and bench budgets that name a removed
-symbol; each is disposed of under `standards/testing-tdd.md` §Behavior-preserving changes.
-A removed symbol can still be named outside `touches:`: by a `use` or a re-export, a bench,
-a test file the census does not read, or another symbol that only tests reach. The
-compiler finds each. A row whose removal needs a file or a symbol not listed here stays,
-with that reason in the PR body.
-
-- **ST22.1:** WHEN the client is type-checked and its vitest suites run THEY SHALL pass.
-
-Confirmed in the diff at merge, not by a criterion: each deleted test has its
-`moved-tests:` row, and the run removed no row it did not confirm.
-
-Build note (st-22): structure.spec.md st-22 asks for 'mr-prune keep' on the resetLearnedKeys orphan,
-but mr-prune keep records twin pairs only: 'mr-prune keep --file client/src/input/glyphs.ts --test
-resetLearnedKeys' returns PRUNE-KEEP-FAIL missing. The kept orphan therefore stays in every census;
-a census-row keep for orphans (or the spec wording) needs a decision. Also: controlsModel.test.ts
-'lists the two tabs, the twelve button rows...' lines that compare controlsRows(...) with
-VBUTTONS.map/ACCELS.map now compare the file-local enumerator with its own definition (the deleted
-export was their only subject); a test-health slice may drop those two expectations.
-
 ### st-23 — decision log: the desktop-shell entry left by st-20
 
 type: docs · tier: routine
@@ -248,102 +53,110 @@ after: [st-20, lpw-10]
 - **st-23.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of the entry in the document the PR's `moved:` row names, and every fact kept in the entry SHALL match the code at the merge base.
 - DoD: st-23.1 and st-23.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
 
-### st-24 — client platform: the hand-off port
+### st-27 — client platform: the request notices
 
 type: refactor · tier: hard
-touches: client/src/platform/handoff.ts, client/src/platform/handoff.test.ts, client/src/main.ts, client/src/main.*.test.ts, docs/refactors/client-platform.md, ARCHITECTURE.md
-after: [st-21]
+touches: client/src/main.ts, client/src/shell/notices.ts, client/src/shell/notices.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, client/src/ui/i18n/catalogParity.test.ts, docs/refactors/client-platform.md, docs/refactors/client-shell.md, ARCHITECTURE.md
+after: [st-26]
 
-Extraction 1 of `docs/refactors/client-platform.md` §4, an interface change (a new port).
-`client/src/platform/handoff.ts` is created with two functions. `openExternal(url)` holds
-`applyMenuStep`'s `window.open(url, '_blank', 'noopener')` (the store row, today
-`OWNERSHIP_STORE_URL`). `saveFile(file, onBlocked)` takes the file (its name, its MIME type and
-its text) and what to do when the host blocks the save; it holds `downloadExportBundle`'s steps
-from the `Blob` to the click, runs `onBlocked` where today's `catch` runs, and removes the
-anchor and revokes the URL in its `finally`, so the order of those steps is today's.
-`applyMenuStep` and `downloadExportBundle` call them; the export keeps its completeness guard and
-passes its static console line and its blocked-download message as `onBlocked`. The file's name
-is computed before the call (`exportBundleFilename`, `client/src/ui/privacyBanner.ts`, formats a
-request id and a clock reading and throws on neither). `downloadBugBundle` is not touched (the
-plan's finding F3). Measured at `71c0bce7`: `applyMenuStep`, `downloadExportBundle` and
-`downloadBugBundle` are declared in `client/src/main.ts`, which holds one `window.open`; no
-`client/src/platform/` directory exists.
+Extraction 4 of `docs/refactors/client-platform.md` §4, an interface change (owner functions).
+`client/src/shell/notices.ts` takes `dismissedRequests`, `announcedRequests`,
+`answeredRequests`, `noticeInput`, `livePending`, `requestLine`, `releaseAnswered` and
+`openedTradeSessions`. `dispatch`, `worldPort`, `openTradeEditor`, `resetTradeSessionState`,
+the listener that announces a new request, the listener that follows the trade sessions and the
+`connect` callbacks in `main` mutate the four sets today; each mutation becomes a function the
+module owns, and those callers stay in `main.ts` and call it. `dispatch` is reached through the
+command port (`shell/commandPort.ts`, st-26), so the module imports no other shell module for
+it. The sets' contents, the order of every mutation and every string the notices show stay as
+they are. Measured at `af826856`: all eight names, `dispatch`, `worldPort`, `openTradeEditor`,
+`resetTradeSessionState` and `main` are declared at the top level of `client/src/main.ts`; no
+`client/src/shell/notices.ts` exists. The run measures the names again at its base.
 
-Pins: none known. The text pin in `client/src/main.dispatch.test.ts` reads `movementGate`,
-`worldBaseLive` and a dispatch table out of `main.ts`, none of which moves; the whole-tree i18n
-scans cover the new file. Covering tests: `client/src/main.exportTransport.test.ts`,
-`client/src/main.menu.test.ts`, `client/src/main.signInGate.test.ts`; the run adds
-`client/src/platform/handoff.test.ts` for the port's own two functions.
+Pins: none known. The source-text pin in `client/src/main.dispatch.test.ts` (SO2) reads
+`movementGate`, `worldBaseLive`, `overlayProbes`, `overlayHandles` and `screenViews`, none of
+which moves here. `catalogParity.test.ts` gains the module in its roster if the module resolves
+a string. Covering tests: `client/src/main.notices.test.ts`, `client/src/main.noticesRt.test.ts`,
+`client/src/main.reconnectStack.test.ts`; the run adds `client/src/shell/notices.test.ts` for
+the owner functions.
 
-- **ST24.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+- **ST27.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
   suites run THEY SHALL pass with every assertion unedited.
-- **ST24.2:** WHEN the client's full vitest suite runs IT SHALL pass, with
-  `client/src/platform/handoff.test.ts` passing.
+- **ST27.2:** WHEN the client's full vitest suite runs IT SHALL pass, with
+  `client/src/shell/notices.test.ts` passing.
 
-Confirmed in the diff at merge, not by a criterion: `main.ts` holds no `window.open`, no
-`URL.createObjectURL` and no hidden download anchor for the export; `handoff.ts` imports no
-shell module and registers nothing on `window` or `document`; `downloadBugBundle` is unchanged;
-its plan line is gone.
+Confirmed in the diff at merge, not by a criterion: the eight names are declared in
+`shell/notices.ts` and nowhere in `main.ts`; no caller outside the module adds to or deletes from
+the four sets except through an owner function; `notices.ts` registers nothing on `store`,
+`window` or `document`; its plan line is gone.
 
-### st-25 — client platform: the sign-in constants move to the shell config
-
-type: refactor · tier: routine
-touches: client/src/main.ts, client/src/shell/config.ts, client/src/shell/config.test.ts, client/src/main.*.test.ts, docs/refactors/client-platform.md, docs/refactors/client-shell.md, ARCHITECTURE.md
-after: [st-24]
-
-Extraction 2 of `docs/refactors/client-platform.md` §4, a move.
-`client/src/shell/config.ts` takes `OPERATED_BY_US`, `OIDC_ISSUER`, `SIGN_IN_MODE` and
-`ACCOUNT_REQUIRED` with their comments. They are constants with no writer, resolved from
-`TARGET_KIND` (already exported by `config.ts`) and one build value
-(`VITE_MR_OIDC_ISSUER`); `config.ts` gains one type import (`SignInMode`, from
-`client/src/net/connection.ts`) and nothing at run time. `SIGN_IN_OFFER` stays (it goes with
-extraction 8); `TELEMETRY_CONFIG` and the locale block stay in `main.ts`. Measured at
-`71c0bce7`: the four are declared in `client/src/main.ts` beside `SIGN_IN_OFFER`; the
-`OIDC_ISSUER` constants in `client/src/main.signInGate.test.ts` and
-`client/src/main.targetKindGate.test.ts` and the `ACCOUNT_REQUIRED` in
-`client/src/ui/claimModel.test.ts` are the tests' own locals, not reads of `main.ts`.
-
-Pins: none known. Covering tests: `client/src/shell/config.test.ts`,
-`client/src/main.signInGate.test.ts`, `client/src/main.targetKindGate.test.ts`.
-
-- **ST25.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
-  suites and `client/src/shell/config.test.ts` run THEY SHALL pass with every assertion unedited.
-
-Confirmed in the diff at merge, not by a criterion: the four names are declared in
-`shell/config.ts` and nowhere in `main.ts`; their bodies change only by imports; `config.ts`
-gains no run-time import; its plan line is gone.
-
-### st-26 — client platform: the command port
+### st-28 — client platform: the battle frame
 
 type: refactor · tier: hard
-touches: client/src/main.ts, client/src/shell/commandPort.ts, client/src/shell/commandPort.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, docs/refactors/client-platform.md, docs/refactors/client-shell.md, ARCHITECTURE.md, docs/DECISIONS.md
-after: [st-25]
+touches: client/src/main.ts, client/src/shell/battleFrame.ts, client/src/shell/battleFrame.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, client/src/ui/i18n/catalogParity.test.ts, docs/refactors/client-platform.md, docs/refactors/client-shell.md, ARCHITECTURE.md
+after: [st-27]
 
-Extraction 3 of `docs/refactors/client-platform.md` §4, an interface change (a new port, the
-plan's §2.2). `client/src/shell/commandPort.ts` is created: a module that imports no shell
-module and holds a typed object with two members, `dispatch` and `applyStack`, installed once by
-`main.ts` beside the hint host (`installHintHost`) before its first listener registers, and
-throwing until then, as the hint host does. `buildDeployPanel`, `buildResultsPanel`,
-`tacticsShellDeps`, `runInteract`, `applyMenuStep` and `closeTradeEditor` call `dispatch`
-through it, and `popOverBattleBeforeSwitch` and `showSignInGate` call `applyStack` through it.
-Every caller stays in `main.ts`; this slice adds the port so the later extractions are moves.
-Measured at `71c0bce7`: all eight callers, `dispatch`, `applyStack` and the `installHintHost`
-call are in `client/src/main.ts`.
+Extraction 5 of `docs/refactors/client-platform.md` §4, an interface change (a battle port).
+`client/src/shell/battleFrame.ts` takes the forty-four names the plan's row 5 lists, from
+`battleViews` to `holdResultsForPlayback`, and the body of the listener that feeds
+`serverClock`. The interface the module gives `main.ts`: the battle port (the stack reads and the
+outcome edge), the `battleMount` mount, a reset for the lines `resetPredictionState` resets
+(`resultsAwaitDrain` and `serverClock` among them) and the latch `closeFrame` writes.
+`resetPredictionState` and `closeFrame` stay in `main.ts` and call it. `buildDeployPanel`,
+`buildResultsPanel`, `tacticsShellDeps` and `popOverBattleBeforeSwitch` keep reaching `dispatch`
+and `applyStack` through the command port. Registration order, the panels' DOM and every
+asserted value stay as they are. Measured at `af826856`: all forty-four names,
+`resetPredictionState` and `closeFrame` are declared at the top level of `client/src/main.ts`;
+no `client/src/shell/battleFrame.ts` exists. The run measures the names again at its base. This
+row moves boot wiring, so it runs the end-to-end suite as well.
 
-Pins: none known; the text pin in `client/src/main.dispatch.test.ts` reads none of the eight
-callers. `docs/DECISIONS.md` "Code leaves `client/src/main.ts` into owner modules under
-`client/src/shell/`; `main.ts` stays the composition root" names the ports and gains this one,
-rewritten in place. Covering tests: `client/src/main.dispatch.test.ts`,
-`client/src/main.menu.test.ts`, `client/src/main.signInGate.test.ts`,
-`client/src/main.social.test.ts`; the run adds `client/src/shell/commandPort.test.ts` for the
-throw-before-install and the installed pass-through.
+Pins: none known; SO2 in `client/src/main.dispatch.test.ts` reads no name this row moves.
+Covering tests: `client/src/main.dispatch.test.ts`, `client/src/main.battle-reseed.test.ts`,
+`client/src/tactics/tacticsBattle.test.ts`, `client/src/tactics/deployPanel.test.ts`,
+`client/src/tactics/results.test.ts`; the run adds `client/src/shell/battleFrame.test.ts` for
+the port.
 
-- **ST26.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+- **ST28.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
   suites run THEY SHALL pass with every assertion unedited.
-- **ST26.2:** WHEN the client's full vitest suite runs IT SHALL pass, with
-  `client/src/shell/commandPort.test.ts` passing.
+- **ST28.2:** WHEN the client's full vitest suite runs IT SHALL pass, with
+  `client/src/shell/battleFrame.test.ts` passing.
+- **ST28.3:** WHEN `just e2e` runs at the slice's head IT SHALL pass with no spec edited.
 
-Confirmed in the diff at merge, not by a criterion: the eight callers reach `dispatch` and
-`applyStack` only through the port; `commandPort.ts` imports no shell module and registers
-nothing on `store`, `window` or `document`; the port is installed before the first listener;
-the DECISIONS entry names it; its plan line is gone.
+Confirmed in the diff at merge, not by a criterion: the forty-four names are declared in
+`shell/battleFrame.ts` and nowhere in `main.ts`; `main.ts` reaches the battle state only through
+the port; the listener that feeds `serverClock` registers in the same order as before; its plan
+line is gone.
+
+### st-29 — client platform: the frames and the context stack
+
+type: refactor · tier: hard
+touches: client/src/main.ts, client/src/shell/frames.ts, client/src/shell/frames.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, client/src/ui/i18n/catalogParity.test.ts, docs/refactors/client-platform.md, docs/refactors/client-shell.md, ARCHITECTURE.md, docs/DECISIONS.md
+after: [st-28]
+
+Extraction 6 of `docs/refactors/client-platform.md` §4, an interface change.
+`client/src/shell/frames.ts` takes the thirty-six names the plan's row 6 lists, from
+`overlayProbes` to `worldIsBare` (`contextStack`, `syncStack`, `reconcileStack`, `movementGate`,
+`worldBaseLive`, `openFrame` and `hideFrame` among them). The interface: `main` sweeps
+`contextStack` on reconnect and writes `autoContinuedAtMs` and `lastCareTickAtMs` in the frame
+loop, each through a function the module owns; the battle frame (st-28) clears
+`outcomeShownAtMs` and `autoContinuedAtMs` through its port. Measured at `af826856`: all
+thirty-six names are declared at the top level of `client/src/main.ts`, `contextStack` as a
+`let`; no `client/src/shell/frames.ts` exists. The run measures the names again at its base.
+
+Pins: SO2 in `client/src/main.dispatch.test.ts` reads `main.ts`'s source for `movementGate`,
+`worldBaseLive` (SO2-5) and the three mirrored tables `overlayProbes`, `overlayHandles`,
+`screenViews` (SO2-6), all of which move. Disposition: the two needles read
+`client/src/shell/frames.ts` instead; the file path is the only edit, and every expectation and
+message in SO2 stays byte-identical. `docs/DECISIONS.md` "Context stack ownership" names
+`main.ts` as the stack's home and is rewritten in place to name `shell/frames.ts`. Covering
+tests: `client/src/main.dispatch.test.ts`, `client/src/main.reconnectStack.test.ts`,
+`client/src/main.a11yFocus.test.ts`; the run adds `client/src/shell/frames.test.ts` for the
+owner functions.
+
+- **ST29.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites run THEY SHALL pass with every assertion unedited, the SO2 source path the one change.
+- **ST29.2:** WHEN the client's full vitest suite runs IT SHALL pass, with
+  `client/src/shell/frames.test.ts` passing.
+
+Confirmed in the diff at merge, not by a criterion: the thirty-six names are declared in
+`shell/frames.ts` and nowhere in `main.ts`; nothing outside the module assigns `contextStack`;
+SO2's diff is its path line only; the DECISIONS entry names the new home; its plan line is gone.
