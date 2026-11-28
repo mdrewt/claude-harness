@@ -2,7 +2,8 @@
 
 This launch is part of the phase-split experiment (`memory/projects/mr-phase-ab`): the build runs
 as three sessions, so no one session carries the whole slice's context. **This session runs phase
-`<PHASE>` only**; when it ends, the launcher starts a fresh session for the next phase. The phase
+`<PHASE>` only**; when it ends, the launcher starts a fresh session for the next phase. This
+block adds that phase's end to the brief's valid stopping points. The phase
 end below is a valid stopping point and overrides the brief's list for it; everything else in the
 brief still binds (scope, stop flags, checkpoints, the acceptance ledger, the budget, never merge).
 
