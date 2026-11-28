@@ -36,7 +36,9 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
    A feature slice's `touches:` lists the files its design names and every file a sibling slice
    also edits, because fan-out reads it. The pins and callers that only a build-time measurement
    (a probe, a red test, a compile error) reveals are added by the build itself
-   (`memory/projects/mr-touches widen`), so the list carries no guesses. A test or fixture that
+   (`memory/projects/mr-touches widen`), so the list carries no guesses. It also lists the docs
+   that describe the behaviour the slice changes (an `AGENTS.md` or `docs/<area>.md` section, a
+   README), so the build can keep them true instead of filing their drift as a residual. A test or fixture that
    names a type, field or exported symbol the slice removes, renames or re-types is found by
    grepping for that name, not guessed: list it, so the tester adapts it and fan-out sees it.
    CI, hook, `justfile` and test-runner config files are never added that way: a slice that
@@ -102,7 +104,8 @@ operator adds to PLAN §9. M-postgate-console-controls and M-postgate-client-cov
      the gap.
    - For each slice, name what its build would most likely defer (a criterion too big for its
      `touches:`, a behaviour that needs a sibling's change) and resolve it now: resize the slice,
-     add one, or name the deferral.
+     add one, or name the deferral. Slice count is never a goal: size by dependency and
+     reviewability, never to raise or lower the count.
 3. **Review lenses**: reviewer + red-team + `/simplify` on the draft, against `standards/` and
    the M{N}→M{N+1} boundary. Apply real findings; note what changed.
 4. **Document.** A `docs/DECISIONS.md` entry in the game repo is the BUILD slice's job, not the
