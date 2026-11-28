@@ -79,7 +79,10 @@ judgment), or
   `total_cost_usd` is cumulative and carries across `--resume`), and the `cost-state` record
   the CLI leaves in the session transcript, which exists even for a session killed or
   rate-limited before any result event. `attempts` = invocations in the log; `notes` carries
-  `session=<CLI session id>`, and says so when the figure came from the transcript.
+  `session=<CLI session id>`, and says so when the figure came from the transcript. `model` is
+  the model the run was LAUNCHED on; `model_used` (rows since 2026-11-28) is the model family its
+  main-thread turns ran on, `+`-joined largest share first when `model_fallback` moved it
+  (`fable+opus`). Rows before then say `fable` for hard-tier runs that ran entirely on Opus.
   `cost_usd: null` always comes with `COST-UNKNOWN (<reason>)` in `notes` — neither source
   reports a cost, or the log is gone. `COST-PARTIAL (…)` marks a lower bound: an attempt was
   killed before its first result and the transcript adds nothing.

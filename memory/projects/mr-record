@@ -480,6 +480,7 @@ notes=a.get("notes","")
 # mr-cost-sum, which reports the session's own spend from a counter that is cumulative across
 # `--resume`, and falls back on the session transcript when the log reports less.
 run_log=a.get("from-log")
+model_used=None
 run=None
 # The helper beside the copy being run, so a worktree's mr-record reads with its own reader.
 # Invoked via sys.executable so a lost exec bit, ENOEXEC or an asdf shim cannot take out a
@@ -596,6 +597,13 @@ if run_log:
             m=str(run["model"])
             model="escalated:%s-to-fable"%m if run.get("escalated") else m
             if not re.match(r"^(opus|sonnet|haiku|fable|escalated:(opus|sonnet|haiku|fable)-to-fable)$", model): model=""
+        # The model the session RAN on, from its main-thread turns (mr-cost-sum `models_used`): `model`
+        # stays the launch model, and a run model_fallback moved names both, largest share first.
+        mu=run.get("models_used") or {}
+        if isinstance(mu,dict) and mu:
+            tot=sum(v for v in mu.values() if isinstance(v,int))
+            fams=[f for f,v in sorted(mu.items(),key=lambda kv:-kv[1]) if isinstance(v,int) and tot and v>=0.1*tot]
+            if fams and all(re.match(r"^(fable|opus|sonnet|haiku)$",f) for f in fams): model_used="+".join(fams)
         if run.get("session_id"): notes=why("session=%s"%run["session_id"])
         # A log that started several sessions (a phased launch) names each one's share, so top_up
         # compares every session with what the rows already carry for IT, never the whole row.
@@ -667,6 +675,7 @@ row={"ts":ts,"run_id":a.get("run_id","n/a"),"slice":slice_,"outcome":outcome,"co
      "orchestration_audit":a.get("orch",""),"gating_test_audit":a.get("gating",""),
      "remote_red_fix_cycles":int(a.get("cycles") or 0),"consecutive_standdowns":int(a.get("standdowns") or 0),
      "master_ci_after":ci_value,"notes":notes}
+if model_used: row["model_used"]=model_used
 line=json.dumps(row)
 json.loads(line)  # verify parse
 if not row["ts"]: die("empty ts")
