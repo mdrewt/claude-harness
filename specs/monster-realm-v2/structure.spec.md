@@ -247,3 +247,103 @@ after: [st-20, lpw-10]
 
 - **st-23.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of the entry in the document the PR's `moved:` row names, and every fact kept in the entry SHALL match the code at the merge base.
 - DoD: st-23.1 and st-23.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
+
+### st-24 — client platform: the hand-off port
+
+type: refactor · tier: hard
+touches: client/src/platform/handoff.ts, client/src/platform/handoff.test.ts, client/src/main.ts, client/src/main.*.test.ts, docs/refactors/client-platform.md, ARCHITECTURE.md
+after: [st-21]
+
+Extraction 1 of `docs/refactors/client-platform.md` §4, an interface change (a new port).
+`client/src/platform/handoff.ts` is created with two functions. `openExternal(url)` holds
+`applyMenuStep`'s `window.open(url, '_blank', 'noopener')` (the store row, today
+`OWNERSHIP_STORE_URL`). `saveFile(file, onBlocked)` takes the file (its name, its MIME type and
+its text) and what to do when the host blocks the save; it holds `downloadExportBundle`'s steps
+from the `Blob` to the click, runs `onBlocked` where today's `catch` runs, and removes the
+anchor and revokes the URL in its `finally`, so the order of those steps is today's.
+`applyMenuStep` and `downloadExportBundle` call them; the export keeps its completeness guard and
+passes its static console line and its blocked-download message as `onBlocked`. The file's name
+is computed before the call (`exportBundleFilename`, `client/src/ui/privacyBanner.ts`, formats a
+request id and a clock reading and throws on neither). `downloadBugBundle` is not touched (the
+plan's finding F3). Measured at `71c0bce7`: `applyMenuStep`, `downloadExportBundle` and
+`downloadBugBundle` are declared in `client/src/main.ts`, which holds one `window.open`; no
+`client/src/platform/` directory exists.
+
+Pins: none known. The text pin in `client/src/main.dispatch.test.ts` reads `movementGate`,
+`worldBaseLive` and a dispatch table out of `main.ts`, none of which moves; the whole-tree i18n
+scans cover the new file. Covering tests: `client/src/main.exportTransport.test.ts`,
+`client/src/main.menu.test.ts`, `client/src/main.signInGate.test.ts`; the run adds
+`client/src/platform/handoff.test.ts` for the port's own two functions.
+
+- **ST24.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites run THEY SHALL pass with every assertion unedited.
+- **ST24.2:** WHEN the client's full vitest suite runs IT SHALL pass, with
+  `client/src/platform/handoff.test.ts` passing.
+
+Confirmed in the diff at merge, not by a criterion: `main.ts` holds no `window.open`, no
+`URL.createObjectURL` and no hidden download anchor for the export; `handoff.ts` imports no
+shell module and registers nothing on `window` or `document`; `downloadBugBundle` is unchanged;
+its plan line is gone.
+
+### st-25 — client platform: the sign-in constants move to the shell config
+
+type: refactor · tier: routine
+touches: client/src/main.ts, client/src/shell/config.ts, client/src/shell/config.test.ts, client/src/main.*.test.ts, docs/refactors/client-platform.md, docs/refactors/client-shell.md, ARCHITECTURE.md
+after: [st-24]
+
+Extraction 2 of `docs/refactors/client-platform.md` §4, a move.
+`client/src/shell/config.ts` takes `OPERATED_BY_US`, `OIDC_ISSUER`, `SIGN_IN_MODE` and
+`ACCOUNT_REQUIRED` with their comments. They are constants with no writer, resolved from
+`TARGET_KIND` (already exported by `config.ts`) and one build value
+(`VITE_MR_OIDC_ISSUER`); `config.ts` gains one type import (`SignInMode`, from
+`client/src/net/connection.ts`) and nothing at run time. `SIGN_IN_OFFER` stays (it goes with
+extraction 8); `TELEMETRY_CONFIG` and the locale block stay in `main.ts`. Measured at
+`71c0bce7`: the four are declared in `client/src/main.ts` beside `SIGN_IN_OFFER`; the
+`OIDC_ISSUER` constants in `client/src/main.signInGate.test.ts` and
+`client/src/main.targetKindGate.test.ts` and the `ACCOUNT_REQUIRED` in
+`client/src/ui/claimModel.test.ts` are the tests' own locals, not reads of `main.ts`.
+
+Pins: none known. Covering tests: `client/src/shell/config.test.ts`,
+`client/src/main.signInGate.test.ts`, `client/src/main.targetKindGate.test.ts`.
+
+- **ST25.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites and `client/src/shell/config.test.ts` run THEY SHALL pass with every assertion unedited.
+
+Confirmed in the diff at merge, not by a criterion: the four names are declared in
+`shell/config.ts` and nowhere in `main.ts`; their bodies change only by imports; `config.ts`
+gains no run-time import; its plan line is gone.
+
+### st-26 — client platform: the command port
+
+type: refactor · tier: hard
+touches: client/src/main.ts, client/src/shell/commandPort.ts, client/src/shell/commandPort.test.ts, client/src/main.*.test.ts, client/test-util/mainBootHarness.ts, docs/refactors/client-platform.md, docs/refactors/client-shell.md, ARCHITECTURE.md, docs/DECISIONS.md
+after: [st-25]
+
+Extraction 3 of `docs/refactors/client-platform.md` §4, an interface change (a new port, the
+plan's §2.2). `client/src/shell/commandPort.ts` is created: a module that imports no shell
+module and holds a typed object with two members, `dispatch` and `applyStack`, installed once by
+`main.ts` beside the hint host (`installHintHost`) before its first listener registers, and
+throwing until then, as the hint host does. `buildDeployPanel`, `buildResultsPanel`,
+`tacticsShellDeps`, `runInteract`, `applyMenuStep` and `closeTradeEditor` call `dispatch`
+through it, and `popOverBattleBeforeSwitch` and `showSignInGate` call `applyStack` through it.
+Every caller stays in `main.ts`; this slice adds the port so the later extractions are moves.
+Measured at `71c0bce7`: all eight callers, `dispatch`, `applyStack` and the `installHintHost`
+call are in `client/src/main.ts`.
+
+Pins: none known; the text pin in `client/src/main.dispatch.test.ts` reads none of the eight
+callers. `docs/DECISIONS.md` "Code leaves `client/src/main.ts` into owner modules under
+`client/src/shell/`; `main.ts` stays the composition root" names the ports and gains this one,
+rewritten in place. Covering tests: `client/src/main.dispatch.test.ts`,
+`client/src/main.menu.test.ts`, `client/src/main.signInGate.test.ts`,
+`client/src/main.social.test.ts`; the run adds `client/src/shell/commandPort.test.ts` for the
+throw-before-install and the installed pass-through.
+
+- **ST26.1:** WHEN the client is type-checked and linted and the `client/src/main.*.test.ts`
+  suites run THEY SHALL pass with every assertion unedited.
+- **ST26.2:** WHEN the client's full vitest suite runs IT SHALL pass, with
+  `client/src/shell/commandPort.test.ts` passing.
+
+Confirmed in the diff at merge, not by a criterion: the eight callers reach `dispatch` and
+`applyStack` only through the port; `commandPort.ts` imports no shell module and registers
+nothing on `store`, `window` or `document`; the port is installed before the first listener;
+the DECISIONS entry names it; its plan line is gone.
