@@ -263,16 +263,17 @@ the code plus the game repo's `ARCHITECTURE.md` and `docs/DECISIONS.md`.
 - Corrective: **M-test-truth** (`ttd-1`; one whole-tree i18n scan replaces the per-file
   scans) · **M-stack-ownership** (`so-*`; the context stack owns player-opened frames).
 - Follow-up rounds: an `N.5` milestone, an "Nth review residuals" milestone, an
-  `M-weekly-review-<date>` milestone and an `NNr-*` slice id each name a review follow-up to the
-  numbered work. **M-weekly-review-2026-11-27** (`wr261127-*`): a guest claim erases the retired
-  guest's world rows, an account's deletion takes its handle off the world's allowlist, the
-  owner's `drop_world_binding` brings the bound accounts under the list's bound, the rename
-  overlay's "(unnamed)" comes from the catalog, the turn-bar Surge and Retreat badges lead the
-  tuning they warn about, a `my_account` row that lands after the first snapshot still completes
-  the guest claim, a dev password reset ends the account's earlier sign-ins, and the harness
-  `standards/testing-tdd.md` rule that a slice's suite assumes a loaded, shared host; the game's
-  `docs/DECISIONS.md` "A world that is not open refuses an unadmitted identity at connect and in
-  every reducer; the owner relays the door". **M-playtest-a…d** prepared the
+  `M-weekly-review-<date>` milestone and an `NNr-*` slice id each name a review follow-up.
+  **M-weekly-review-2026-11-27** (`wr261127-*`): a guest claim erases the retired guest's world
+  rows; an account's deletion delists it from the world's allowlist when its own world row still
+  stands and no other identity's carries it; the owner's `drop_world_binding` brings the bound
+  accounts under the list's bound; the rename overlay's "(unnamed)" comes from the catalog; the
+  turn-bar Surge and Retreat badges lead the tuning they warn about; a `my_account` row that
+  lands after the first snapshot still completes the guest claim; a dev password reset refuses
+  the codes and refresh tokens of earlier sign-ins (an ID token already issued lives out its TTL);
+  and the harness `standards/testing-tdd.md` rule that a slice's suite assumes a loaded, shared
+  host; the game's `docs/DECISIONS.md` "A world that is not open refuses an unadmitted identity
+  at connect and in every reducer; the owner relays the door". **M-playtest-a…d** prepared the
   2026-07 playtest and the other **M-postgate-\*** / **M-evolution-essence-\*** milestones
   acted on it.
 - Test health: **M-test-health** (`th-*`; the CI `e2e` job lists each test that passed only on
