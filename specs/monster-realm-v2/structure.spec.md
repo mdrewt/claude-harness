@@ -145,6 +145,52 @@ after: [st-19, lpw-35, lpw-37]
 - **st-20.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of an entry in the document the PR's `moved:` row names, and every fact kept in an entry SHALL match the code at the merge base.
 - DoD: st-20.1 and st-20.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
 
+Build note (st-20): st-20: twenty-one of the twenty-four entries stay over standards/decisions.md's
+25 lines after the rewrite (heading to pointer line, blanks included): A private world checks an
+account itself 109, A world that is not open 79, Ownership is enforced 64, One character per account
+60, An attestation names the server 50, Every player must own the game on Steam 50, A target's kind
+49, Private servers 47, The account service 43, A browser binds 42, The official build 37, The
+client learns 36, The connection target 33, Local-play budgets 31, Ports 31, Ed25519 30, The gate
+checks a world's password 29, Sized for 1,000 28, Desktop token 27, Electron 27 (left for lpw-10),
+e2e rerun listing 26. st-20.1 keeps every held reason and rules-out clause verbatim; the Why and
+Rules-out paragraphs alone pass 25 lines in the long entries, and no reviewer pass named a clause
+that could go. 'Every player…' and 'The account service…' grew in physical lines only because their
+before-text held lines of 1,000+ characters. Several entries hold more than one decision (the
+private-world check holds first contact, the re-check, the host check and the address rule); a split
+is outside a docs slice.
+
+Build note (st-20): st-20 finding: docs/DECISIONS.md 'The connection target is run-time
+configuration…' Why keeps 'and the unit suites that import main.ts issue no request', a reason
+resting on tests (standards/decisions.md). Two product rewrites were tried and the reviewer refused
+both as false: importing main.ts runs main(), which fetches chunks and connects
+(client/src/main.ts:5634), and the page's /shell-config.js is itself a request
+(client/index.html:155). The fetch's real cost (the throw leaves module scope) is already in the
+entry's Rules out. The next edit of the entry drops the clause or gives a product reason.
+
+Build note (st-20): st-20 finding (reviewer pass 3): the code comment at
+server-module/src/accounts.rs:75-76 says a world build with no published production key 'accepts no
+binding and entitles nobody', mixing two reasons: the missing key stops binding (accounts.rs:75-77),
+and the placeholder world-check address stops entitlement (accounts.rs:92-96). docs/DECISIONS.md
+'The official build holds no attestation key…' and ARCHITECTURE.md Build profiles now give each its
+reason. A comment-accuracy fix outside st-20's touches.
+
+Build note (st-20): st-20 -> acs-15: acs-15's DoD ('no document but the design record states the
+attestation as current') will need to rewrite docs/DECISIONS.md 'The attestation is signed with
+Ed25519…', 'An attestation names the server…', 'A browser binds a friends server…', 'The official
+build holds no attestation key…' (its key half) and the attestation sentence of 'The account service
+is our own small OIDC issuer…', and ARCHITECTURE.md Private worlds (The attestation check, World
+names, Build profiles). acs-15's section names none of these entries, so st-20 rewrote them to the
+decision-log shape; acs-15 does not list docs/DECISIONS.md's sibling ARCHITECTURE.md in touches.
+
+Build note (st-20): st-20 gate run: just ci went red at account-test in 2 of 2 full runs, and just
+account-test alone red in 2 of 2, each time one test, account-service/src/deployment.test.ts 'the
+local-dev recipe > discovery is served through Caddy…' (connect ECONNREFUSED 127.0.0.1:<port> after
+60 s), the Docker Desktop port-forward flake of R-lpw-39-NOTE8318F6. The same file alone passed
+14/14 and the whole account-service suite with --no-file-parallelism passed 2862/2862; the slice
+changes only docs/DECISIONS.md and ARCHITECTURE.md. The flake has grown from 'a different test each
+run' to the same test every parallel run on this host; a stale container
+mr-auth-test-d236a0ce-account-local-dev-1 had been Up 29 hours.
+
 ### st-22 — M-gamepad: twin tests and unreached symbols from the close census
 type: refactor · tier: routine
 touches: client/src/input/bindingStore.test.ts, client/src/input/glyphs.test.ts, client/src/input/glyphs.ts, client/src/ui/controlsModel.test.ts, client/src/ui/controlsModel.ts, client/src/ui/controlsView.test.ts
@@ -189,3 +235,15 @@ a census-row keep for orphans (or the spec wording) needs a decision. Also: cont
 'lists the two tabs, the twelve button rows...' lines that compare controlsRows(...) with
 VBUTTONS.map/ACCELS.map now compare the file-local enumerator with its own definition (the deleted
 export was their only subject); a test-health slice may drop those two expectations.
+
+### st-23 — decision log: the desktop-shell entry left by st-20
+
+type: docs · tier: routine
+touches: docs/DECISIONS.md, ARCHITECTURE.md
+after: [st-20, lpw-10]
+- Supervisor, 2026-11-28 (st-20's section: an entry another open slice rewrites is left for that slice, then sectioned here `after:` it). st-20 (#913) left "The desktop shell is Electron; a preload script hands the client its connection" byte-identical, because lpw-10's DoD amends it. Once lpw-10 has merged, that one entry is brought to `standards/decisions.md` on st-20's terms: the claim, the reason and what it rules out, in 10 to 25 lines with one pointer; mechanics move to `ARCHITECTURE.md` under the subsystem's heading; a measurement moves to its record (`docs/local-play.md` §2) when one exists. The entry is not merged with another or deleted, and its title stays unless lpw-10's amendment changed it.
+
+- **st-23.1:** WHEN the slice merges, THE SYSTEM SHALL state each reason and each "rules out" clause the entry held after lpw-10's amendment, or name its removal in the PR with the reason.
+
+- **st-23.2:** WHEN the slice merges, THE SYSTEM SHALL hold every passage it moved out of the entry in the document the PR's `moved:` row names, and every fact kept in the entry SHALL match the code at the merge base.
+- DoD: st-23.1 and st-23.2 answered by the reviewer with citations; no file but the two in `touches:` changed.
